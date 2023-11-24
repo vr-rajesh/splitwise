@@ -8,10 +8,9 @@ import com.scaler.Splitwise.models.UserExpense;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.swing.text.StyleContext;
 import java.util.*;
 
-public class HeapBasedSettleUpStrategy implements SettleUpStrategy{
+public class HeapBasedSettleUpStrategy implements SettleUpStrategy {
 
     private static final Logger logger = LoggerFactory.getLogger(HeapBasedSettleUpStrategy.class);
 
@@ -46,12 +45,32 @@ public class HeapBasedSettleUpStrategy implements SettleUpStrategy{
         // calculate the transaction until the heap becomes Empty
         while(!minHeap.isEmpty())
         {
-            minHeap.poll();
-            maxHeap.poll();
+            Map.Entry<User, Double> minHeapDebit = minHeap.poll();
+            Map.Entry<User, Double> maxHeapCredit = maxHeap.poll();
+            TransactionResponseDTO transactionResponseDTO = new TransactionResponseDTO(
+                    minHeapDebit.getKey().getName(),
+                    maxHeapCredit.getKey().getName(),
+                    Math.min( Math.abs(minHeapDebit.getValue()), maxHeapCredit.getValue())); // storing the new balance
+            // for our understanding we have taken debit as -ve  and credit as +ve
+            // but in real time balances cant be negative
+            // that is why we are taking abs to remove the -ve for debitAmount
+
+            transactionResponseDTOS.add(transactionResponseDTO);
+
+            double newBalance = minHeapDebit.getValue() + maxHeapCredit.getValue();
+            if(newBalance == 0){
+                logger.info(minHeapDebit.getKey().getName() + "owes to " + maxHeapCredit.getKey().getName());
+            }
+            else if(newBalance < 0) {
+                minHeapDebit.setValue(newBalance);
+                minHeap.add(minHeapDebit);
+            }
+            else if(newBalance > 0){
+                maxHeapCredit.setValue(newBalance);
+                maxHeap.add(maxHeapCredit);
+            }
         }
-
-
-        return null;
+        return transactionResponseDTOS;
     }
 
     private Double calculateCurrentOutstandingAmount(Double currentOutStandingAmount, UserExpense userExpense) {
@@ -61,7 +80,6 @@ public class HeapBasedSettleUpStrategy implements SettleUpStrategy{
         }
         else{
             currentAmount -= userExpense.getAmount();
-
         }
         return currentAmount;
     }
